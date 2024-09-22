@@ -13,7 +13,8 @@ from .api import API
 from .twspace import Twspace
 
 DEFAULT_FNAME_FORMAT = "(%(creator_name)s)%(title)s-%(id)s"
-MP4_COVER_FORMAT_MAP = {"jpg": MP4Cover.FORMAT_JPEG, "png": MP4Cover.FORMAT_PNG}
+MP4_COVER_FORMAT_MAP = {
+    "jpg": MP4Cover.FORMAT_JPEG, "png": MP4Cover.FORMAT_PNG}
 
 
 class TwspaceDL:
@@ -28,7 +29,12 @@ class TwspaceDL:
     def filename(self) -> str:
         """Returns the formatted filename"""
         filename = self.space.format(self.format_str)
-        return filename
+
+        # Keep alphanumeric characters and spaces
+        sanitized_title = re.sub(r'[^\w\s]', '', filename)
+        sanitized_title = sanitized_title.replace(
+            ' ', '_')  # Replace spaces with underscores
+        return sanitized_title
 
     @cached_property
     def dyn_url(self) -> str:
@@ -71,7 +77,8 @@ class TwspaceDL:
     def playlist_text(self) -> str:
         """Modify the chunks URL using the master one to be able to download"""
         playlist_text = API.client.get(self.playlist_url).text
-        master_url_wo_file = re.sub(r"master_playlist\.m3u8.*", "", self.master_url)
+        master_url_wo_file = re.sub(
+            r"master_playlist\.m3u8.*", "", self.master_url)
         playlist_text = re.sub(r"(?=chunk)", master_url_wo_file, playlist_text)
         return playlist_text
 
@@ -178,9 +185,11 @@ class TwspaceDL:
                 ]
                 meta.save()
             else:
-                logging.error(f"Unsupported user profile image format: {cover_ext}")
+                logging.error(
+                    f"Unsupported user profile image format: {cover_ext}")
         except RuntimeError:
-            logging.error(f"Cannot download user profile image from URL: {cover_url}")
+            logging.error(
+                f"Cannot download user profile image from URL: {cover_url}")
             raise
 
     def cleanup(self) -> None:

@@ -1,6 +1,7 @@
 """Script designed to help download twitter spaces"""
 
 import argparse
+import re
 import datetime
 import json
 import logging
@@ -25,7 +26,8 @@ def exception_hook(
 ) -> None:
     """Make Exceptions more legible for the end users"""
     # Exception type and value
-    print(f"\033[31;1;4mError\033[0m: {exc_value}\nRetry with -v to see more details")
+    print(f"\033[31;1;4mError\033[0m: {
+          exc_value}\nRetry with -v to see more details")
 
 
 def space(args: argparse.Namespace) -> int:
@@ -128,7 +130,8 @@ def main() -> int:
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-s", "--skip-download", action="store_true")
     parser.add_argument("-k", "--keep-files", action="store_true")
-    parser.add_argument("-l", "--log", action="store_true", help="create logfile")
+    parser.add_argument("-l", "--log", action="store_true",
+                        help="create logfile")
     parser.add_argument(
         "-c",
         "--input-cookie-file",
@@ -143,7 +146,8 @@ def main() -> int:
         required=True,
     )
 
-    input_method.add_argument("-i", "--input-url", type=str, metavar="SPACE_URL")
+    input_method.add_argument(
+        "-i", "--input-url", type=str, metavar="SPACE_URL")
     input_method.add_argument("-U", "--user-url", type=str, metavar="USER_URL")
     input_group.add_argument(
         "-d",
@@ -189,6 +193,12 @@ def main() -> int:
         "--output",
         type=str,
         metavar="FORMAT_STR",
+    )
+    output_group.add_argument(
+        "-fn",
+        "--file-name",
+        type=str,
+        default=None,
     )
     output_group.add_argument(
         "-m",
