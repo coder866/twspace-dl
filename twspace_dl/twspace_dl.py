@@ -34,9 +34,10 @@ class TwspaceDL:
         sanitized_title = re.sub(r'[^\w\s]', '', filename)
         sanitized_title = sanitized_title.replace(
             ' ', '_')  # Replace spaces with underscores
-        clean_filename = sanitized_title.replace('__', '_').lower()
+        clean_filename = sanitized_title.replace('__', '_').replace('.', '')
+        clean_filename = clean_filename.replace('-', '_')
 
-        return clean_filename
+        return clean_filename.lower()
 
     @cached_property
     def dyn_url(self) -> str:
