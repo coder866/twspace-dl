@@ -26,8 +26,8 @@ def exception_hook(
 ) -> None:
     """Make Exceptions more legible for the end users"""
     # Exception type and value
-    print(f"\033[31;1;4mError\033[0m: {
-          exc_value}\nRetry with -v to see more details")
+    print(f"""\033[31;1;4mError\033[0m:\
+          {exc_value}\nRetry with -v to see more details""")
 
 
 def space(args: argparse.Namespace) -> int:
