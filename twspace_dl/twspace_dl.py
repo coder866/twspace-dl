@@ -34,7 +34,7 @@ class TwspaceDL:
         sanitized_title = re.sub(r'[^\w\s]', '', filename)
         sanitized_title = sanitized_title.replace(
             ' ', '_')  # Replace spaces with underscores
-        clean_filename = sanitized_title.replace('__', '_')
+        clean_filename = sanitized_title.replace('__', '_').lower()
 
         return clean_filename
 
