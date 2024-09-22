@@ -9,3 +9,6 @@ __pycache__
 cookies.txt
 master_urls.txt
 setup.py
+# build
+dist
+twspace_dl.egg-info
