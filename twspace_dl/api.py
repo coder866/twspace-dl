@@ -7,8 +7,7 @@ from typing import Any, NoReturn
 
 import requests
 from requests.adapters import HTTPAdapter, Retry
-from requests.exceptions import (ConnectionError, HTTPError, JSONDecodeError,
-                                 RetryError)
+from requests.exceptions import ConnectionError, HTTPError, JSONDecodeError, RetryError
 
 from .cookies import validate_cookies
 
@@ -265,7 +264,7 @@ class GraphQLAPI(APIClient):
         - raise RuntimeError: If the specified URL is not a valid Twitter user profile URL.
         """
         if match := re.match(
-            r"^(?:https?:\/\/|)twitter\.com\/(?P<screen_name>\w+)$", user_url.strip("/")
+            r"^(?:https?:\/\/|)x\.com\/(?P<screen_name>\w+)$", user_url.strip("/")
         ):
             return self.user_id(match.group("screen_name"))
         raise RuntimeError(f"Invalid Twitter user URL: {user_url}")
