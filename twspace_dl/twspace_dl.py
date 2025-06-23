@@ -12,7 +12,7 @@ from mutagen.mp4 import MP4, MP4Cover
 from .api import API
 from .twspace import Twspace
 
-DEFAULT_FNAME_FORMAT = "(%(creator_name)s)_%(title)s_%(id)s"
+DEFAULT_FNAME_FORMAT = "(%(creator_name)s)_%(title)s_%(start_date)s_%(id)s"
 MP4_COVER_FORMAT_MAP = {"jpg": MP4Cover.FORMAT_JPEG, "png": MP4Cover.FORMAT_PNG}
 
 
