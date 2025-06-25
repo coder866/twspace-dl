@@ -35,7 +35,9 @@ class Twspace(dict):
             if creator_info := root["creator_results"]["result"].get("legacy"):  # type: ignore
                 self["creator_name"] = creator_info["name"]  # type: ignore
                 self["creator_screen_name"] = creator_info["screen_name"]  # type: ignore
-                self["creator_profile_image_url"] = creator_info["profile_image_url_https"].replace("_normal", "")  # type: ignore
+                self["creator_profile_image_url"] = creator_info[
+                    "profile_image_url_https"
+                ].replace("_normal", "")  # type: ignore
                 self["creator_id"] = API.graphql_api.user_id(
                     creator_info["screen_name"]
                 )
@@ -163,7 +165,7 @@ class Twspace(dict):
             ]["broadcast_id"]
         except KeyError as err:
             raise ValueError(
-                "Broadcast ID is not available.\nUser is probably not live"
+                "Broadcast ID is not available or User is probably not live"
             ) from err
         return cls(cls._metadata(broadcast_id))
 
