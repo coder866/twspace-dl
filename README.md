@@ -194,3 +194,79 @@ docker run --rm -v .:/output holoarchivists/twspace-dl -i space_url
 2. Edit `.env` and fill in the Twitter username you want to monitor.
 3. Put a cookies file into the folder and named it `cookies.txt`.
 4. `docker-compose up -d`
+
+
+
+
+# Twitter Spaces Downloader — API Compatibility Fix
+
+## Problem summary
+Recent changes to Twitter (x.com) GraphQL endpoints and authentication caused the downloader to break. The main issues were:
+
+- API endpoint 404s due to changed endpoint paths, query IDs and missing headers.  
+- Response structure changes: creator/profile fields moved from legacy objects to new core objects and avatar.image_url replaced profile_image_url_https.  
+- New authentication/header requirements: additional headers (x-twitter-active-user, x-twitter-auth-type, etc.), content-type fixes, and updated user-agent strings.
+
+## Fix overview
+Implemented fixes in four areas: API client architecture, GraphQL query usage, data extraction logic, and error handling.
+
+### 1) API client & endpoint fixes
+- Use the HTTPClient abstraction correctly (self.client.get() rather than self.session.get()).  
+- Build GraphQL endpoints as /graphql/{query_id}/{operation_name}.  
+- Add comprehensive browser-like headers, for example:
+
+```python
+headers = {
+  "x-twitter-active-user": "yes",
+  "x-twitter-auth-type": "OAuth2Session",
+  "x-twitter-client-language": "en",
+  "content-type": "application/json",
+  "referer": "https://x.com/",
+  # sec-ch-ua and other browser headers...
+}
+```
+
+### 2) GraphQL queries & parameters
+- Replaced outdated query IDs with current ones (example: rC2zlE1t7SHbVG8obPZliQ for audio_space_by_id).  
+- Updated features string and variables format to match current API expectations.
+
+### 3) Dual-path data extraction
+- Handle both new (core) and legacy response shapes when reading creator info:
+
+```python
+if "core" in creator_result:
+  core = creator_result["core"]
+  self["creator_name"] = core.get("name", "")
+  self["creator_screen_name"] = core.get("screen_name", "")
+elif "legacy" in creator_result:
+  legacy = creator_result["legacy"]
+  self["creator_name"] = legacy.get("name", "")
+  self["creator_screen_name"] = legacy.get("screen_name", "")
+```
+
+- Profile images: try avatar.image_url first, fall back to legacy.profile_image_url_https.
+
+### 4) Error handling & diagnostics
+- Improved handling and messages for HTTP 404s with diagnostics.  
+- Graceful fallbacks when fields are missing.  
+- Added request/response debug logging and retained retry logic for transient failures.
+
+## Key technical changes (files)
+- api.py
+  - Fixed GraphQLAPI inheritance from APIClient.
+  - Corrected endpoint path construction.
+  - Updated audio_space_by_id() with current query ID and features.
+  - Added comprehensive HTTP headers.
+
+- twspace.py
+  - Rewrote creator extraction to support core and legacy structures.
+  - Added profile image extraction from avatar.image_url with legacy fallback.
+  - Added defensive code for missing fields.
+
+- HTTPClient (or http_client.py)
+  - Enhanced 404 diagnostics and error messages.
+  - Added request/response logging for debugging.
+  - Kept retry logic for transient network failures.
+
+## Result
+The changes restore compatibility with Twitter's updated GraphQL endpoints and response formats, improve robustness against future API shifts, and provide better diagnostics for debugging regressions.

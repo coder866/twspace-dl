@@ -100,32 +100,9 @@ class APIClient:
         self.client = client
         self.base_url = self.join_url(self._API_URL, path)
         self.cookies = cookies
-
-        # Get the ct0 token from cookies
-        ct0_token = cookies.get("ct0", "")
-
-        # Add more headers to match browser requests
         self.headers = {
             "authorization": TWITTER_AUTHORIZATION,
-            "x-csrf-token": ct0_token,
-            "content-type": "application/json",
-            "x-twitter-active-user": "yes",
-            "x-twitter-auth-type": "OAuth2Session",
-            "x-twitter-client-language": "en",
-            "accept": "*/*",
-            "accept-encoding": "gzip, deflate, br, zstd",
-            "accept-language": "en-US,en;q=0.9",
-            "dnt": "1",
-            "priority": "u=1, i",
-            "sec-ch-ua": '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Linux"',
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "origin": "https://x.com",
-            "referer": "https://x.com/",
-            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+            "x-csrf-token": cookies["ct0"],
         }
 
     def join_url(self, *paths: str) -> str:
@@ -146,16 +123,8 @@ class APIClient:
         - raise RuntimeError: If the response from the API cannot be decoded as a JSON string.
         """
         try:
-            # Build the full URL
-            full_url = self.join_url(self.base_url, path)
-
-            # Log the request for debugging
-            logging.debug(f"Making API request to: {full_url}")
-            logging.debug(f"Params: {params}")
-
-            # Use self.client.get() instead of trying to access session directly
             response = self.client.get(
-                full_url,
+                self.join_url(self.base_url, path),
                 params=params,
                 headers=self.headers,
                 cookies=self.cookies,
@@ -179,8 +148,20 @@ class GraphQLAPI(APIClient):
         - path: The path to add to the base URL of the API.
         - cookies: The cookies used for making all requests to the API.
         """
-        # Ensure we're using the correct path for GraphQL API
-        super().__init__(client, "graphql", cookies)
+        super().__init__(client, path, cookies)
+
+    def _dump_json(self, obj: Any) -> str:
+        """Serialize the object to a compact JSON string.
+
+        The object will be returned directly if it is a string.
+
+        - obj: The object to be serialized to JSON.
+
+        - return: A compact JSON string representing the specified object.
+        """
+        if isinstance(obj, str):
+            return obj
+        return json.dumps(obj, indent=None, separators=(",", ":"))
 
     def get(
         self,
@@ -198,80 +179,10 @@ class GraphQLAPI(APIClient):
 
         - return: The returned object of the query.
         """
-        params = {
-            "variables": self._dump_json(variables),
-        }
+        params = {"variables": self._dump_json(variables)}
         if features:
             params["features"] = self._dump_json(features)
-
-        # Build the endpoint path according to the actual Twitter API structure
-        # The path should be: graphql/{query_id}/{operation_name}
-        endpoint_path = f"{query_id}/{operation_name}"
-
-        # Log the request for debugging
-        logging.debug(f"Making GraphQL request to: {endpoint_path}")
-        logging.debug(f"Query ID: {query_id}")
-        logging.debug(f"Operation: {operation_name}")
-        logging.debug(f"Variables: {variables}")
-        if features:
-            logging.debug(f"Features: {features[:100]}...")
-
-        return super().get(endpoint_path, params)
-
-    def _dump_json(self, obj: Any) -> str:
-        """Serialize the object to a compact JSON string.
-
-        The object will be returned directly if it is a string.
-
-        - obj: The object to be serialized to JSON.
-
-        - return: A compact JSON string representing the specified object.
-        """
-        if isinstance(obj, str):
-            return obj
-        return json.dumps(obj, indent=None, separators=(",", ":"))
-
-    # def audio_space_by_id(self, space_id: str) -> dict:
-    #     """Query Twitter Space details by its ID.
-
-    #     - space_id: The ID of the Twitter Space.
-
-    #     - return: The details of the queried Twitter Space.
-    #     """
-    #     # Valid ID as of Dec 2025
-    #     query_id = "rC2zlE1t7SHbVG8obPZliQ"
-    #     operation_name = "AudioSpaceById"
-
-    #     variables = {
-    #         "id": space_id,
-    #         "isMetatagsQuery": False,  # UPDATED: Changed from True to False
-    #         "withReplays": True,
-    #         "withListeners": True,
-    #     }
-
-    #     # UPDATED: Exact features map from your browser inspection
-    #     features = (
-    #         '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,'
-    #         '"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,'
-    #         '"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,'
-    #         '"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,'
-    #         '"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,'
-    #         '"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,'
-    #         '"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,'
-    #         '"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,'
-    #         '"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,'
-    #         '"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,'
-    #         '"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,'
-    #         '"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,'
-    #         '"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,'
-    #         '"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,'
-    #         '"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,'
-    #         '"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,'
-    #         '"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,'
-    #         '"responsive_web_enhance_cards_enabled":false}'
-    #     )
-
-    #     return self.get(query_id, operation_name, variables, features)
+        return super().get(self.join_url(query_id, operation_name), params)
 
     def audio_space_by_id(self, space_id: str) -> dict:
         """Query Twitter Space details by its ID.
@@ -286,13 +197,32 @@ class GraphQLAPI(APIClient):
 
         variables = {
             "id": space_id,
-            "isMetatagsQuery": False,
+            "isMetatagsQuery": False,  # UPDATED: Changed from True to False
             "withReplays": True,
             "withListeners": True,
         }
 
-        # Use the exact features string from browser request
-        features = '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,"responsive_web_enhance_cards_enabled":false}'
+        # UPDATED: Exact features map from your browser inspection
+        features = (
+            '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,'
+            '"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,'
+            '"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,'
+            '"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,'
+            '"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,'
+            '"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,'
+            '"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,'
+            '"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,'
+            '"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,'
+            '"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,'
+            '"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,'
+            '"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,'
+            '"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,'
+            '"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,'
+            '"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,'
+            '"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,'
+            '"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,'
+            '"responsive_web_enhance_cards_enabled":false}'
+        )
 
         return self.get(query_id, operation_name, variables, features)
 
@@ -303,17 +233,13 @@ class GraphQLAPI(APIClient):
 
         - return: The details of the queried Twitter user.
         """
-        # Updated query_id based on common Twitter API patterns
-        query_id = "G3KGOASz96M-Qu0nwmGXNg"
+        # query_id = "oUZZZ8Oddwxs8Cd3iW3UEA"
+        query_id = "-oaLodhGbbnzJBACb1kk2Q"
         operation_name = "UserByScreenName"
         variables = {"screen_name": screen_name, "withSafetyModeUserFields": True}
-
-        # Updated features string to match current Twitter requirements
-        features = '{"hidden_profile_likes_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"tweetypie_unmention_optimization_enabled":true,"vibe_api_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"rweb_video_timestamps_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_enhance_cards_enabled":false}'
-
+        # "features" is copied as-is from real requests
+        features = '{"hidden_profile_likes_enabled":false,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"subscriptions_verification_info_verified_since_enabled":true,"highlights_tweets_tab_ui_enabled":true,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_graphql_timeline_navigation_enabled":true}'
         return self.get(query_id, operation_name, variables, features)
-
-    # In api.py, update the profile_spotlights_query method:
 
     def profile_spotlights_query(self, screen_name: str) -> dict:
         """Backup API endpoint to query Twitter user details by their screen name (@ handle).
@@ -326,15 +252,11 @@ class GraphQLAPI(APIClient):
 
         - return: The details of the queried Twitter user.
         """
-        # Updated query_id
-        query_id = "9zwVLJ48lmVUk8u_Gh9DmA"
+        # query_id = "ZQEuHPrIYlvh1NAyIQHP_w"
+        query_id = "vqu78dKcEkW-UAYLw5rriA"
         operation_name = "ProfileSpotlightsQuery"
         variables = {"screen_name": screen_name}
-
-        # Add features parameter
-        features = '{"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_enhance_cards_enabled":false}'
-
-        return self.get(query_id, operation_name, variables, features)
+        return self.get(query_id, operation_name, variables)
 
     def user_id(self, screen_name: str) -> str:
         """Retrieve the numeric user ID (`rest_id`) of the user with the specified screen name (@ handle).

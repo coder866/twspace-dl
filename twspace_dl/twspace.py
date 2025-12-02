@@ -32,21 +32,48 @@ class Twspace(dict):
         )
         if metadata:
             root = defaultdict(str, metadata["data"]["audioSpace"]["metadata"])
-            if creator_info := root["creator_results"]["result"].get("legacy"):  # type: ignore
-                self["creator_name"] = creator_info["name"]  # type: ignore
-                self["creator_screen_name"] = creator_info["screen_name"]  # type: ignore
-                self["creator_profile_image_url"] = creator_info[
-                    "profile_image_url_https"
-                ].replace("_normal", "")  # type: ignore
-                self["creator_id"] = API.graphql_api.user_id(
-                    creator_info["screen_name"]
-                )
 
+            # Extract creator info - FIXED VERSION
+            creator_result = root["creator_results"]["result"]
+
+            # Check if we have the core object with name and screen_name
+            if "core" in creator_result:
+                core_info = creator_result["core"]
+                self["creator_name"] = core_info.get("name", "")
+                self["creator_screen_name"] = core_info.get("screen_name", "")
+            # Fallback to legacy object
+            elif "legacy" in creator_result:
+                legacy_info = creator_result["legacy"]
+                self["creator_name"] = legacy_info.get("name", "")
+                self["creator_screen_name"] = legacy_info.get("screen_name", "")
+
+            # Get profile image
+            if "avatar" in creator_result:
+                avatar_info = creator_result["avatar"]
+                profile_image_url = avatar_info.get("image_url", "")
+                if profile_image_url:
+                    self["creator_profile_image_url"] = profile_image_url.replace(
+                        "_normal", ""
+                    )
+            elif "legacy" in creator_result:
+                # Fallback to legacy profile image
+                legacy_info = creator_result["legacy"]
+                profile_image_url = legacy_info.get("profile_image_url_https", "")
+                if profile_image_url:
+                    self["creator_profile_image_url"] = profile_image_url.replace(
+                        "_normal", ""
+                    )
+
+            # Get creator ID
+            self["creator_id"] = creator_result.get("rest_id", "")
+
+            # Rest of the initialization remains the same...
             self.source = metadata
             self.root = root
             self["id"] = root["rest_id"]
             self["url"] = "https://x.com/i/spaces/" + self["id"]
             self["title"] = root["title"]
+
             try:
                 self["start_date"] = datetime.fromtimestamp(
                     int(root["started_at"]) / 1000
