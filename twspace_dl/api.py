@@ -55,12 +55,30 @@ class HTTPClient:
         - return: The response of the request.
 
         - raise RuntimeError: Raised when the request was not successful (max retries, timeouts, and
-          4xx and 5xx HTTP status codes).
+        4xx and 5xx HTTP status codes).
         """
         try:
+            logging.debug(f"HTTP GET: {url}")
+            logging.debug(f"Params: {params}")
+
+            # Make the request
             response = self.session.get(
                 url, params=params, headers=headers, cookies=cookies, timeout=timeout
             )
+
+            # Log response info for debugging
+            logging.debug(f"Response status: {response.status_code}")
+            logging.debug(f"Response URL: {response.url}")
+            logging.debug(f"Response encoding: {response.encoding}")
+            logging.debug(f"Response apparent encoding: {response.apparent_encoding}")
+
+            # Try to fix encoding if needed
+            if response.encoding is None:
+                response.encoding = "utf-8"
+
+            # Check the raw content first few bytes
+            logging.debug(f"First 100 bytes of raw content: {response.content[:100]}")
+
             response.raise_for_status()
             return response
         except RetryError as e:
@@ -74,13 +92,142 @@ class HTTPClient:
             )
             raise RuntimeError("API request failed with connection error") from e
         except HTTPError as e:
-            if e.response.status_code == requests.codes.TOO_MANY_REQUESTS:
+            if e.response.status_code == 404:
+                logging.error(f"API endpoint not found (404): {url}")
+                logging.debug(f"Response headers: {dict(e.response.headers)}")
+                logging.debug(f"Response text: {e.response.text[:2000]}")
+                raise RuntimeError(
+                    f"Twitter API endpoint not found. Status: {e.response.status_code}"
+                ) from e
+            elif e.response.status_code == requests.codes.TOO_MANY_REQUESTS:
                 logging.error(f"API rate limit exceeded with URL: {url}")
-                raise
+                raise RuntimeError("API rate limit exceeded") from e
+            elif e.response.status_code == 403:
+                logging.error(f"Access forbidden (403) for URL: {url}")
+                logging.debug(f"Response text: {e.response.text[:2000]}")
+                raise RuntimeError(
+                    "Access forbidden. Check your cookies/authentication."
+                ) from e
             logging.error(
                 f"HTTP error occurred with URL: {e.request.url}, status code: {e.response.status_code}"
             )
-            raise RuntimeError("API request failed with HTTP error") from e
+            logging.debug(f"Response text: {e.response.text[:2000]}")
+            raise RuntimeError(
+                f"API request failed with HTTP error: {e.response.status_code}"
+            ) from e
+
+    # def get(
+    #     self,
+    #     url: str,
+    #     params: dict[str, str] = {},
+    #     headers: dict[str, str] = {},
+    #     cookies: dict[str, str] = {},
+    #     timeout: int = TIMEOUT,
+    # ) -> requests.Response:
+    #     """Send HTTP GET requests to the specified URL.
+
+    #     - url: The URL to send the GET request to.
+    #     - params: Query parameters of the request.
+    #     - headers: HTTP headers of the request.
+    #     - cookies: HTTP cookies of the request.
+    #     - timeout: The connection timeout of the request, default to the static value specified above.
+
+    #     - return: The response of the request.
+
+    #     - raise RuntimeError: Raised when the request was not successful (max retries, timeouts, and
+    #     4xx and 5xx HTTP status codes).
+    #     """
+    #     try:
+    #         logging.debug(f"HTTP GET: {url}")
+    #         logging.debug(f"Params: {params}")
+    #         logging.debug(f"Headers keys: {list(headers.keys())}")
+
+    #         response = self.session.get(
+    #             url, params=params, headers=headers, cookies=cookies, timeout=timeout
+    #         )
+
+    #         # Log response info for debugging
+    #         logging.debug(f"Response status: {response.status_code}")
+    #         logging.debug(f"Response URL: {response.url}")
+    #         if response.status_code != 200:
+    #             logging.debug(f"Response text (first 1000 chars): {response.text[:1000]}")
+
+    #         response.raise_for_status()
+    #         return response
+    #     except RetryError as e:
+    #         logging.error(
+    #             f"Max retries exceeded with URL: {e.request.url}, reason: {e.args[0].reason}"
+    #         )
+    #         raise RuntimeError("API request failed after max retries") from e
+    #     except ConnectionError as e:
+    #         logging.error(
+    #             f"Connection error occurred with URL: {e.request.url}, reason: {e.args[0].reason}"
+    #         )
+    #         raise RuntimeError("API request failed with connection error") from e
+    #     except HTTPError as e:
+    #         if e.response.status_code == 404:
+    #             logging.error(f"API endpoint not found (404): {url}")
+    #             logging.debug(f"Response headers: {dict(e.response.headers)}")
+    #             logging.debug(f"Response text: {e.response.text[:2000]}")
+    #             raise RuntimeError(f"Twitter API endpoint not found. The API might have changed. Status: {e.response.status_code}") from e
+    #         elif e.response.status_code == requests.codes.TOO_MANY_REQUESTS:
+    #             logging.error(f"API rate limit exceeded with URL: {url}")
+    #             raise RuntimeError("API rate limit exceeded") from e
+    #         elif e.response.status_code == 403:
+    #             logging.error(f"Access forbidden (403) for URL: {url}")
+    #             logging.debug(f"Response text: {e.response.text[:2000]}")
+    #             raise RuntimeError("Access forbidden. Check your cookies/authentication.") from e
+    #         logging.error(
+    #             f"HTTP error occurred with URL: {e.request.url}, status code: {e.response.status_code}"
+    #         )
+    #         logging.debug(f"Response text: {e.response.text[:2000]}")
+    #         raise RuntimeError(f"API request failed with HTTP error: {e.response.status_code}") from e
+
+    # def get(
+    #     self,
+    #     url: str,
+    #     params: dict[str, str] = {},
+    #     headers: dict[str, str] = {},
+    #     cookies: dict[str, str] = {},
+    #     timeout: int = TIMEOUT,
+    # ) -> requests.Response:
+    #     """Send HTTP GET requests to the specified URL.
+
+    #     - url: The URL to send the GET request to.
+    #     - params: Query parameters of the request.
+    #     - headers: HTTP headers of the request.
+    #     - cookies: HTTP cookies of the request.
+    #     - timeout: The connection timeout of the request, default to the static value specified above.
+
+    #     - return: The response of the request.
+
+    #     - raise RuntimeError: Raised when the request was not successful (max retries, timeouts, and
+    #       4xx and 5xx HTTP status codes).
+    #     """
+    #     try:
+    #         response = self.session.get(
+    #             url, params=params, headers=headers, cookies=cookies, timeout=timeout
+    #         )
+    #         response.raise_for_status()
+    #         return response
+    #     except RetryError as e:
+    #         logging.error(
+    #             f"Max retries exceeded with URL: {e.request.url}, reason: {e.args[0].reason}"
+    #         )
+    #         raise RuntimeError("API request failed after max retries") from e
+    #     except ConnectionError as e:
+    #         logging.error(
+    #             f"Connection error occurred with URL: {e.request.url}, reason: {e.args[0].reason}"
+    #         )
+    #         raise RuntimeError("API request failed with connection error") from e
+    #     except HTTPError as e:
+    #         if e.response.status_code == requests.codes.TOO_MANY_REQUESTS:
+    #             logging.error(f"API rate limit exceeded with URL: {url}")
+    #             raise
+    #         logging.error(
+    #             f"HTTP error occurred with URL: {e.request.url}, status code: {e.response.status_code}"
+    #         )
+    #         raise RuntimeError("API request failed with HTTP error") from e
 
 
 class APIClient:
@@ -104,7 +251,7 @@ class APIClient:
         # Get the ct0 token from cookies
         ct0_token = cookies.get("ct0", "")
 
-        # Add more headers to match browser requests
+        # Use the EXACT headers that worked in the test script
         self.headers = {
             "authorization": TWITTER_AUTHORIZATION,
             "x-csrf-token": ct0_token,
@@ -113,7 +260,8 @@ class APIClient:
             "x-twitter-auth-type": "OAuth2Session",
             "x-twitter-client-language": "en",
             "accept": "*/*",
-            "accept-encoding": "gzip, deflate, br, zstd",
+            # CRITICAL: Use gzip, deflate ONLY (no brotli)
+            "accept-encoding": "gzip, deflate",
             "accept-language": "en-US,en;q=0.9",
             "dnt": "1",
             "priority": "u=1, i",
@@ -152,6 +300,7 @@ class APIClient:
             # Log the request for debugging
             logging.debug(f"Making API request to: {full_url}")
             logging.debug(f"Params: {params}")
+            logging.debug(f"Headers being sent: {self.headers}")
 
             # Use self.client.get() instead of trying to access session directly
             response = self.client.get(
@@ -160,13 +309,68 @@ class APIClient:
                 headers=self.headers,
                 cookies=self.cookies,
             )
+
+            # Debug: Log response status
+            logging.debug(f"Response status: {response.status_code}")
+            logging.debug(f"Response URL: {response.url}")
+            logging.debug(
+                f"Content-Encoding: {response.headers.get('content-encoding')}"
+            )
+            logging.debug(f"Content-Length: {len(response.content)}")
+
+            # Check first character of response
+            if response.text:
+                first_char = response.text[0] if response.text else "None"
+                logging.debug(
+                    f"First character of response: '{first_char}' (ord: {ord(first_char) if first_char != 'None' else 'N/A'})"
+                )
+
             return response.json()
+
         except JSONDecodeError:
             logging.error(
                 f"Cannot decode response from URL: {response.url}, status code: {response.status_code}"
             )
-            logging.debug(f"Response text: {response.text!r}")
+            logging.error(f"Response headers: {dict(response.headers)}")
+            logging.error(f"Response text (first 500 chars): {response.text[:500]}")
+            # Check what the actual content is
+            logging.error(
+                f"Raw content (first 20 bytes hex): {response.content[:20].hex()}"
+            )
             raise RuntimeError("API response cannot be decoded as JSON")
+
+    # def get(self, path: str, params: dict[str, str] = {}) -> Any:
+    #     """Send HTTP GET requests to the specified path of the API with the specified query parameters.
+
+    #     - path: The path to send the API request to.
+    #     - params: Query parameters of the request.
+
+    #     - return: The object decoded from the JSON string returned from the API.
+
+    #     - raise RuntimeError: If the response from the API cannot be decoded as a JSON string.
+    #     """
+    #     try:
+    #         # Build the full URL
+    #         full_url = self.join_url(self.base_url, path)
+
+    #         # Log the request for debugging
+    #         logging.debug(f"Making API request to: {full_url}")
+    #         logging.debug(f"Params: {params}")
+
+    #         # Use self.client.get() instead of trying to access session directly
+    #         response = self.client.get(
+    #             full_url,
+    #             params=params,
+    #             headers=self.headers,
+    #             cookies=self.cookies,
+    #         )
+    #         return response.json()
+    #     except JSONDecodeError:
+    #         logging.error(
+    #             f"Cannot decode response from URL: {response.url}, status code: {response.status_code}"
+    #         )
+    #         logging.debug(f"Response text: {response.text!r}")
+    #         raise RuntimeError("API response cannot be decoded as JSON")
 
 
 class GraphQLAPI(APIClient):
@@ -198,23 +402,46 @@ class GraphQLAPI(APIClient):
 
         - return: The returned object of the query.
         """
-        params = {
-            "variables": self._dump_json(variables),
-        }
-        if features:
-            params["features"] = self._dump_json(features)
+        # Convert variables to JSON string if it's a dict
+        if isinstance(variables, dict):
+            variables_str = json.dumps(variables, separators=(",", ":"))
+        else:
+            variables_str = variables
 
-        # Build the endpoint path according to the actual Twitter API structure
-        # The path should be: graphql/{query_id}/{operation_name}
+        params = {
+            "variables": variables_str,
+        }
+
+        if features:
+            if isinstance(features, dict):
+                features_str = json.dumps(features, separators=(",", ":"))
+            else:
+                features_str = features
+            params["features"] = features_str
+
+        # Build the endpoint path
         endpoint_path = f"{query_id}/{operation_name}"
 
         # Log the request for debugging
         logging.debug(f"Making GraphQL request to: {endpoint_path}")
         logging.debug(f"Query ID: {query_id}")
         logging.debug(f"Operation: {operation_name}")
-        logging.debug(f"Variables: {variables}")
+        logging.debug(
+            f"Variables: {variables_str[:100]}..."
+            if len(variables_str) > 100
+            else f"Variables: {variables_str}"
+        )
+
+        # Fix: Check if features is a string before slicing
         if features:
-            logging.debug(f"Features: {features[:100]}...")
+            if isinstance(features, str):
+                logging.debug(
+                    f"Features: {features[:100]}..."
+                    if len(features) > 100
+                    else f"Features: {features}"
+                )
+            else:
+                logging.debug(f"Features (type: {type(features)}): {features}")
 
         return super().get(endpoint_path, params)
 
@@ -273,6 +500,29 @@ class GraphQLAPI(APIClient):
 
     #     return self.get(query_id, operation_name, variables, features)
 
+    # def audio_space_by_id(self, space_id: str) -> dict:
+    #     """Query Twitter Space details by its ID.
+
+    #     - space_id: The ID of the Twitter Space.
+
+    #     - return: The details of the queried Twitter Space.
+    #     """
+    #     # Valid ID as of Dec 2025
+    #     query_id = "rC2zlE1t7SHbVG8obPZliQ"
+    #     operation_name = "AudioSpaceById"
+
+    #     variables = {
+    #         "id": space_id,
+    #         "isMetatagsQuery": False,
+    #         "withReplays": True,
+    #         "withListeners": True,
+    #     }
+
+    #     # Use the exact features string from browser request
+    #     features = '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,"responsive_web_enhance_cards_enabled":false}'
+
+    #     return self.get(query_id, operation_name, variables, features)
+
     def audio_space_by_id(self, space_id: str) -> dict:
         """Query Twitter Space details by its ID.
 
@@ -291,10 +541,75 @@ class GraphQLAPI(APIClient):
             "withListeners": True,
         }
 
-        # Use the exact features string from browser request
+        # Use the EXACT features string from your successful test
         features = '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,"responsive_web_enhance_cards_enabled":false}'
 
         return self.get(query_id, operation_name, variables, features)
+
+    def audio_space_by_id_fixed(self, space_id: str) -> dict:
+        """Alternative method to handle malformed JSON responses."""
+        import json
+        from urllib.parse import urlencode
+
+        # Build the exact URL
+        variables = {
+            "id": space_id,
+            "isMetatagsQuery": False,
+            "withReplays": True,
+            "withListeners": True,
+        }
+
+        features = (
+            '{"spaces_2022_h2_spaces_communities":true,"spaces_2022_h2_clipping":true,'
+            '"creator_subscriptions_tweet_preview_api_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,'
+            '"responsive_web_profile_redirect_enabled":false,"rweb_tipjar_consumption_enabled":true,'
+            '"verified_phone_label_enabled":false,"premium_content_api_read_enabled":false,'
+            '"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,'
+            '"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,'
+            '"responsive_web_jetfuel_frame":true,"responsive_web_grok_share_attachment_enabled":true,'
+            '"articles_preview_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,'
+            '"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,'
+            '"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,'
+            '"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,'
+            '"responsive_web_grok_show_grok_translated_post":false,"responsive_web_grok_analysis_button_from_backend":true,'
+            '"creator_subscriptions_quote_tweet_preview_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,'
+            '"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,'
+            '"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,'
+            '"responsive_web_grok_image_annotation_enabled":true,"responsive_web_grok_imagine_annotation_enabled":true,'
+            '"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_grok_community_note_auto_translation_is_enabled":false,'
+            '"responsive_web_enhance_cards_enabled":false}'
+        )
+
+        # URL encode the parameters
+        encoded_vars = urlencode(
+            {"variables": json.dumps(variables, separators=(",", ":"))}
+        )
+        encoded_features = urlencode({"features": features})
+
+        url = f"https://x.com/i/api/graphql/rC2zlE1t7SHbVG8obPZliQ/AudioSpaceById?{encoded_vars}&{encoded_features}"
+
+        logging.debug(f"Making direct request to: {url}")
+
+        # FIX: Use self.client.get() instead of self.client.session.get()
+        response = self.client.get(url, headers=self.headers, cookies=self.cookies)
+
+        # Handle the malformed JSON response
+        text = response.text
+
+        # If response starts with ']', find the actual JSON
+        if text.startswith("]"):
+            start_idx = text.find("{")
+            if start_idx != -1:
+                text = text[start_idx:]
+                logging.debug(f"Trimmed {start_idx} characters before '{{'")
+
+        # Try to parse the JSON
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse JSON even after cleaning: {e}")
+            logging.error(f"Cleaned text (first 500 chars): {text[:500]}")
+            raise RuntimeError("Could not decode API response as JSON")
 
     def user_by_screen_name(self, screen_name: str) -> dict:
         """Query Twitter user details by their screen name (@ handle).

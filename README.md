@@ -74,7 +74,7 @@ pip install twspace-dl
 ### From source
 
 ```bash
-pip install git+https://github.com/HoloArchivists/twspace-dl
+pip install git+https://github.com/coder866/twspace-dl.git
 ```
 
 ## Usage
